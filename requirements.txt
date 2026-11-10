@@ -1,0 +1,9 @@
+pandas
+numpy
+Pillow
+torch
+transformers
+datasets
+evaluate
+jiwer
+accelerate

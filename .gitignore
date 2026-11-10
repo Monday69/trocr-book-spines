@@ -1,0 +1,12 @@
+# Données générées et modèles
+fonts/
+synth_crops_*/
+trocr_books_model*/
+*.pt
+*.pth
+*.safetensors
+
+# Python
+__pycache__/
+venv/
+.venv/

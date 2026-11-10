@@ -1,64 +1,78 @@
-Ce dépôt contient les scripts nécessaires à la génération de données synthétiques et au fine-tuning du modèle TrOCR pour la reconnaissance de caractères sur des tranches de livres. Ces codes sont référencés dans l'Annexe E du rapport de projet Library Scanner.
+# TrOCR Book Spines
 
-Structure du Dépôt
-synthetic_factory.py : Script de génération d'images synthétiques.
+Génération de données synthétiques et fine-tuning de [TrOCR](https://huggingface.co/microsoft/trocr-base-printed) pour lire les titres et auteurs sur des **tranches de livres** photographiées en rayon.
 
-train_ocr.py : Script d'entraînement (fine-tuning) du modèle TrOCR.
+Ce dépôt est la brique OCR du projet [BIBLIA-TECH](https://github.com/Monday69/BIBLIA-TECH), un scanner de bibliothèque qui détecte les livres mal rangés (ESME, projet de semestre). Il est référencé dans l'annexe E du rapport du projet.
 
-DATASET_OCR_MASTER.csv : (Requis) Fichier CSV contenant les métadonnées (titres, auteurs) servant de base à la génération.
+## Pipeline
 
-fonts/ : (Requis) Dossier contenant les polices TrueType (.ttf) pour la génération.
+1. **`synthetic_factory.py`** génère jusqu'à 76 500 images de tranches de livres à partir de `DATASET_OCR_MASTER.csv`.
+2. **`train_ocr.py`** fine-tune `microsoft/trocr-base-printed` sur ces images et évalue le CER (Character Error Rate).
 
-Synthèse des Scripts
-1. synthetic_factory.py (Génération de Données)
-Ce script génère un dataset massif de tranches de livres réalistes à partir de textes bruts. Il vise à simuler les conditions difficiles de prise de vue en bibliothèque (NIGHTMARE MODE).
+## Génération de données (`synthetic_factory.py`)
 
-Fonctionnalités clés :
+Chaque image simule une prise de vue difficile en bibliothèque :
 
-Génération massive : Configuré pour produire jusqu'à 76 500 images uniques.
+- **Typographie variée** : police tirée au hasard, mise en page horizontale, verticale ou inversée.
+- **Dégradations réalistes** : bruit numérique, reflets de plastique type flash, ombres, rayures d'usure, flou, variations de contraste et de luminosité, compression JPEG variable.
+- **Sortie** : images `synth_XXXXX.jpg` et un fichier `metadata.jsonl` (`file_name`, `text`) compatible avec Hugging Face `datasets`.
 
-Variabilité Typographique : Sélection aléatoire de polices et gestion des mises en page (horizontale, verticale, inversée).
+La source `DATASET_OCR_MASTER.csv` contient environ 76 600 couples titre / auteur.
 
-Augmentation "Hardcore" : Application de dégradations réalistes :
+## Entraînement (`train_ocr.py`)
 
-Bruit numérique important.
+| Paramètre | Valeur |
+| --- | --- |
+| Modèle de base | `microsoft/trocr-base-printed` |
+| Stratégie | Encodeur vision gelé, seul le décodeur est entraîné |
+| Batch | 4 × 4 étapes d'accumulation = batch effectif de 16 |
+| Learning rate | 1e-6 |
+| Époques | 30 max, avec early stopping sur le CER |
+| Précision | FP16 si CUDA est disponible |
+| Matériel visé | RTX 4070 (12 Go de VRAM) |
 
-Reflets plastiques type flash.
+Le jeu de données est découpé en 80 % entraînement et 20 % validation (`seed=42`).
 
-Ombres portées et rayures d'usure.
+## Utilisation
 
-Variations de contraste et de luminosité.
+### 1. Installation
 
-Sortie : Images JPEG et un fichier metadata.jsonl compatible avec le loader Hugging Face.
+```bash
+pip install -r requirements.txt
+```
 
-2. train_ocr.py (Fine-tuning TrOCR)
-Ce script orchestre l'entraînement supervisé du modèle TrOCR (microsoft/trocr-base-printed) sur le dataset synthétique généré.
+### 2. Polices
 
-Configuration et Optimisations (RTX 4070 / Windows) :
+Le dossier `fonts/` n'est pas versionné. Crée-le à la racine et ajoutes-y des polices TrueType (`.ttf`), par exemple depuis [Google Fonts](https://fonts.google.com). Plus les styles sont variés, plus le modèle sera robuste.
 
-Architecture : Vision-Encoder-Decoder (TrOCR).
+### 3. Génération
 
-Transfer Learning : Encodeur vision gelé (requires_grad = False) ; seul le décodeur est affiné pour optimiser les ressources et le temps.
-
-Gestion Mémoire : Taille de batch réduite (4) combinée à l'accumulation de gradients (4) pour un batch effectif de 16, évitant les erreurs Out-Of-Memory (12Go VRAM).
-
-Précision Mixte (FP16) : Activée si CUDA est disponible pour accélérer le calcul.
-
-Entraînement : Utilisation du Seq2SeqTrainer de Hugging Face avec arrêt précoce (EarlyStopping).
-
-Métrique : Évaluation basée sur le CER (Character Error Rate).
-
-Utilisation Rapide
-Prérequis : Installer les dépendances (PIL, pandas, numpy, torch, transformers, datasets, evaluate).
-
-Génération : Placer DATASET_OCR_MASTER.csv et le dossier fonts/ à la racine, puis lancer :
-
-Bash
+```bash
 python synthetic_factory.py
-Les images seront générées dans synth_crops_v3_hardcore/.
+```
 
-Entraînement : Ajuster le chemin DATA_DIR dans train_ocr.py si nécessaire, puis lancer :
+Les images et `metadata.jsonl` sont écrits dans `synth_crops_v3_hardcore/`.
 
-Bash
+### 4. Entraînement
+
+Dans `train_ocr.py`, fais pointer `DATA_DIR` vers le dossier des images. Le script attend un fichier nommé `metadata_balanced.jsonl` : renomme `metadata.jsonl` (ou ta version rééquilibrée) en conséquence.
+
+```bash
 python train_ocr.py
-Le modèle final sera sauvegardé dans trocr_books_model_final/.
+```
+
+Le meilleur modèle est sauvegardé dans `trocr_books_model_final/`.
+
+## Structure
+
+```
+.
+├── DATASET_OCR_MASTER.csv   # Titres et auteurs source
+├── synthetic_factory.py     # Génération des images synthétiques
+├── train_ocr.py             # Fine-tuning TrOCR
+└── requirements.txt
+```
+
+## Licence
+
+MIT
