@@ -2,7 +2,13 @@
 
 Génération de données synthétiques et fine-tuning de [TrOCR](https://huggingface.co/microsoft/trocr-base-printed) pour lire les titres et auteurs sur des **tranches de livres** photographiées en rayon.
 
-Ce dépôt est la brique OCR du projet [BIBLIA-TECH](https://github.com/Monday69/BIBLIA-TECH), un scanner de bibliothèque qui détecte les livres mal rangés (ESME, projet de semestre). Il est référencé dans l'annexe E du rapport du projet.
+Ce dépôt est une expérimentation menée pour le projet [BIBLIA-TECH](https://github.com/Monday69/BIBLIA-TECH), un scanner de bibliothèque qui détecte les livres mal rangés (ESME, projet de semestre). Il est référencé dans l'annexe E du rapport du projet.
+
+## Résultat
+
+Le modèle converge bien sur les données synthétiques, mais il ne généralise pas aux vraies photos : sur un échantillon réel, le CER atteint **1,18**. Face au bruit visuel ou à une police inconnue, le décodeur ignore l'image et génère des titres mémorisés pendant l'entraînement (hallucination).
+
+Ce résultat a conduit BIBLIA-TECH à passer à PaddleOCR, une approche discriminative qui n'hallucine pas. Le dépôt reste utile comme générateur de données et comme retour d'expérience sur les limites de l'OCR génératif.
 
 ## Pipeline
 
@@ -29,7 +35,7 @@ La source `DATASET_OCR_MASTER.csv` contient environ 76 600 couples titre / auteu
 | Learning rate | 1e-6 |
 | Époques | 30 max, avec early stopping sur le CER |
 | Précision | FP16 si CUDA est disponible |
-| Matériel visé | RTX 4070 (12 Go de VRAM) |
+| Matériel | RTX 4070 Laptop (8 Go de VRAM), environ 24 h d'entraînement |
 
 Le jeu de données est découpé en 80 % entraînement et 20 % validation (`seed=42`).
 
